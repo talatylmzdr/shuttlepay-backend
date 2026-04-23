@@ -10,6 +10,7 @@ import { errorHandler, notFound } from './middleware/errorHandler';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', true);
 const PORT = process.env.PORT || 3000;
 
 // ── Güvenlik middleware ───────────────────────────
@@ -31,6 +32,7 @@ const limiter = rateLimit({
   windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max: Number(process.env.RATE_LIMIT_MAX) || 100,
   message: { success: false, message: 'Çok fazla istek. Lütfen bekle.' },
+  validate: { xForwardedForHeader: false }
 });
 app.use('/api', limiter);
 
