@@ -46,18 +46,18 @@ export const login = async (
 
     const { accessToken } = generateTokens(student.student_id, student.id);
 
+    // MOBİL İÇİN DÜZELTİLDİ: "data" katmanı kaldırıldı, doğrudan ana objeye eklendi
     res.json({
       success: true,
-      data: {
-        token: accessToken,
-        student: {
-          id: student.id,
-          studentId: student.student_id,
-          name: student.name,
-          email: student.email,
-          department: student.department,
-          balance: parseFloat(student.balance),
-        },
+      token: accessToken,
+      student: {
+        id: student.id,
+        studentId: student.student_id,
+        name: student.name,
+        email: student.email,
+        department: student.department,
+        // Null değer gelme ihtimaline karşı güvenlik şeridi
+        balance: student.balance ? parseFloat(student.balance) : 0, 
       },
     });
   } catch (err) {
@@ -99,18 +99,17 @@ export const register = async (
     const student = result.rows[0];
     const { accessToken } = generateTokens(student.student_id, student.id);
 
+    // MOBİL İÇİN DÜZELTİLDİ: "data" katmanı kaldırıldı
     res.status(201).json({
       success: true,
-      data: {
-        token: accessToken,
-        student: {
-          id: student.id,
-          studentId: student.student_id,
-          name: student.name,
-          email: student.email,
-          department: student.department,
-          balance: parseFloat(student.balance),
-        },
+      token: accessToken,
+      student: {
+        id: student.id,
+        studentId: student.student_id,
+        name: student.name,
+        email: student.email,
+        department: student.department,
+        balance: student.balance ? parseFloat(student.balance) : 0,
       },
     });
   } catch (err) {
