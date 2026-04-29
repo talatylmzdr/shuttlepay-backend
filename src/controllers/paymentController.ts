@@ -1,11 +1,15 @@
 // paymentController.ts — Ödeme işlemleri
-// iyzico entegrasyonu dahil
+// iyzico entegrasyonu ve Push Notification dahil
 
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { query } from '../config/database';
 import { createError } from '../middleware/errorHandler';
 import { processPayment } from '../services/iyzico';
+import { Expo } from 'expo-server-sdk'; // <-- BİLDİRİM İÇİN EKLENDİ
+
+// Expo servisini başlatıyoruz
+const expo = new Expo();
 
 // POST /api/payment/load
 export const loadBalance = async (
@@ -19,9 +23,9 @@ export const loadBalance = async (
     if (!amount || amount < 10) return next(createError('Minimum yükleme tutarı ₺10', 400));
     if (amount > 1000) return next(createError('Maksimum yükleme tutarı ₺1000', 400));
 
-    // Öğrenci bilgilerini al
+    // Öğrenci bilgilerini al (DİKKAT: push_token EKLENDİ)
     const studentResult = await query(
-      'SELECT id, balance, name, email FROM students WHERE id = $1 FOR UPDATE',
+      'SELECT id, balance, name, email, push_token FROM students WHERE id = $1 FOR UPDATE',
       [req.studentDbId]
     );
     if (studentResult.rows.length === 0) return next(createError('Öğrenci bulunamadı', 404));
@@ -69,6 +73,25 @@ export const loadBalance = async (
       );
 
       await query('COMMIT');
+
+      // ── BİLDİRİM GÖNDERME İŞLEMİ (YENİ EKLENDİ) ──────────────────────
+      if (student.push_token && Expo.isExpoPushToken(student.push_token)) {
+        try {
+          await expo.sendPushNotificationsAsync([
+            {
+              to: student.push_token,
+              sound: 'default',
+              title: '💳 Bakiye Yüklendi!',
+              body: `${amount} TL bakiyenize başarıyla eklendi. Güncel bakiye: ₺${balanceAfter.toFixed(2)}`,
+              data: { screen: 'History' }, // Bildirime tıklayınca geçilecek ekran
+            },
+          ]);
+          console.log(`Bildirim başarıyla gönderildi: ${student.push_token}`);
+        } catch (pushError) {
+          console.error('Bildirim gönderme hatası (Ödeme başarılı ama bildirim gitmedi):', pushError);
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────
 
       res.json({
         success: true,
