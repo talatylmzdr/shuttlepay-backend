@@ -36,7 +36,7 @@ const limiter = rateLimit({
   message: { success: false, message: 'Çok fazla istek. Lütfen bekle.' },
   validate: false
 });
-app.use('/api', limiter);
+//app.use('/api', limiter);
 
 // ── Body parser ───────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
