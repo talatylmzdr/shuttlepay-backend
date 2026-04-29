@@ -128,3 +128,28 @@ export const getTransactions = async (
     next(err);
   }
 };
+// Token kaydetme fonksiyonu
+export const updatePushToken = async (
+  req: any, // AuthRequest tipin varsa onu kullanabilirsin
+  res: any,
+  next: any
+): Promise<void> => {
+  try {
+    const { pushToken } = req.body;
+    
+    if (!pushToken) {
+      res.status(400).json({ success: false, message: 'Token gönderilmedi' });
+      return;
+    }
+
+    // Supabase'deki push_token odasına bu adresi yazıyoruz
+    await query(
+      'UPDATE students SET push_token = $1 WHERE id = $2',
+      [pushToken, req.studentDbId]
+    );
+
+    res.json({ success: true, message: 'Bildirim adresi başarıyla kaydedildi' });
+  } catch (err) {
+    next(err);
+  }
+};
