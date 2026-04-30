@@ -6,7 +6,7 @@ import { AuthRequest } from '../middleware/auth';
 import { query } from '../config/database';
 import { createError } from '../middleware/errorHandler';
 import { processPayment } from '../services/iyzico';
-import { Expo } from 'expo-server-sdk'; // <-- BİLDİRİM İÇİN EKLENDİ
+import { Expo } from 'expo-server-sdk'; 
 
 // Expo servisini başlatıyoruz
 const expo = new Expo();
@@ -23,7 +23,7 @@ export const loadBalance = async (
     if (!amount || amount < 10) return next(createError('Minimum yükleme tutarı ₺10', 400));
     if (amount > 1000) return next(createError('Maksimum yükleme tutarı ₺1000', 400));
 
-    // Öğrenci bilgilerini al (DİKKAT: push_token EKLENDİ)
+    // Öğrenci bilgilerini al 
     const studentResult = await query(
       'SELECT id, balance, name, email, push_token FROM students WHERE id = $1 FOR UPDATE',
       [req.studentDbId]
@@ -33,13 +33,13 @@ export const loadBalance = async (
     const student = studentResult.rows[0];
     const balanceBefore = parseFloat(student.balance);
 
-    // Kart kontrolü
+    // Kart kontrolü (YENİ GÜNCELLEME: Silinmemiş kartları kontrol et)
     if (cardId) {
       const cardResult = await query(
-        'SELECT id FROM saved_cards WHERE id = $1 AND student_id = $2',
+        'SELECT id FROM saved_cards WHERE id = $1 AND student_id = $2 AND is_deleted = false',
         [cardId, req.studentDbId]
       );
-      if (cardResult.rows.length === 0) return next(createError('Kart bulunamadı', 404));
+      if (cardResult.rows.length === 0) return next(createError('Kart bulunamadı veya silinmiş', 404));
     }
 
     // iyzico ödeme işlemi
@@ -74,7 +74,7 @@ export const loadBalance = async (
 
       await query('COMMIT');
 
-      // ── BİLDİRİM GÖNDERME İŞLEMİ (YENİ EKLENDİ) ──────────────────────
+      // ── BİLDİRİM GÖNDERME İŞLEMİ ──────────────────────
       if (student.push_token && Expo.isExpoPushToken(student.push_token)) {
         try {
           await expo.sendPushNotificationsAsync([
@@ -83,7 +83,7 @@ export const loadBalance = async (
               sound: 'default',
               title: '💳 Bakiye Yüklendi!',
               body: `${amount} TL bakiyenize başarıyla eklendi. Güncel bakiye: ₺${balanceAfter.toFixed(2)}`,
-              data: { screen: 'History' }, // Bildirime tıklayınca geçilecek ekran
+              data: { screen: 'History' }, 
             },
           ]);
           console.log(`Bildirim başarıyla gönderildi: ${student.push_token}`);
@@ -120,8 +120,9 @@ export const getSavedCards = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // UNICORN GÜNCELLEMESİ: Sadece is_deleted = false olanları getir
     const result = await query(
-      'SELECT id, last_four, brand, bank_name, is_default FROM saved_cards WHERE student_id = $1 ORDER BY is_default DESC, created_at DESC',
+      'SELECT id, last_four, brand, bank_name, is_default FROM saved_cards WHERE student_id = $1 AND is_deleted = false ORDER BY is_default DESC, created_at DESC',
       [req.studentDbId]
     );
     res.json({
@@ -173,11 +174,13 @@ export const deleteCard = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // UNICORN GÜNCELLEMESİ: Silmek (DELETE) yerine gizliyoruz (UPDATE)
     const result = await query(
-      'DELETE FROM saved_cards WHERE id = $1 AND student_id = $2 RETURNING id',
+      'UPDATE saved_cards SET is_deleted = true WHERE id = $1 AND student_id = $2 RETURNING id',
       [req.params.id, req.studentDbId]
     );
+    
     if (result.rows.length === 0) return next(createError('Kart bulunamadı', 404));
-    res.json({ success: true, message: 'Kart silindi' });
+    res.json({ success: true, message: 'Kart güvenle silindi (gizlendi)' });
   } catch (err) { next(err); }
 };
